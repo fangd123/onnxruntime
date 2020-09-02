@@ -92,14 +92,32 @@ common::Status SaveInitializedTensors(
     const GraphViewer& graph, const OrtMemoryInfo& default_cpu_memory_info,
     const OrtValueNameIdxMap& ort_value_name_idx_map, ITensorAllocator& planner,
     const std::function<Status(int idx, const OrtValue& value, const OrtCallback& d, bool constant)>& save_tensor_func,
-    const logging::Logger& logger, const DataTransferManager& data_transfer_mgr) {
+    const logging::Logger& logger, const DataTransferManager& data_transfer_mgr, const SessionOptions& session_options) {
   LOGS(logger, INFO) << "Saving initialized tensors.";
   ORT_ENFORCE(ort_value_name_idx_map.MaxIdx() > -1, "OrtValue indexes should have been populated.");
+
+  // Determine if the intializer was supplied by the user in session options and if it is placed on the CPU
+  auto is_initializer_user_supplied_and_on_cpu = [&so](const std::string& name) -> bool {
+    auto it = so.shared_initializers_map.find(name);
+    if (it == so.shared_initializers_map.end()) {
+      return false;
+    }
+    const auto& ort_value = it->second;
+    const auto& mem_info = ort_value.Get<Tensor>.Location();
+    auto mem_type = mem_info.mem_type;
+    if (!(strcmp(mem_info.name, "CPU") == 0 || mem_type == OrtMemTypeCPUOutput || mem_type == OrtMemTypeCPU)) {
+      return false;
+    }
+    return true;
+  };(
 
   //1. first plan the memory
   const onnxruntime::InitializedTensorSet& initialized_tensor_set = graph.GetAllInitializedTensors();
   std::unordered_map<int, const ONNX_NAMESPACE::TensorProto*> id_to_initialized_tensor;
   for (const auto& entry : initialized_tensor_set) {
+    if (is_initializer_user_supplied_and_on_cpu(entry.first)) {
+      continue;
+    }
     int ort_value_index;
     ORT_RETURN_IF_ERROR(ort_value_name_idx_map.GetIdx(entry.first, ort_value_index));
     id_to_initialized_tensor[ort_value_index] = entry.second;
@@ -129,20 +147,23 @@ common::Status SaveInitializedTensors(
     const char* name = (entry.second->name().empty()) ? "" : entry.second->name().c_str();
     const ONNX_NAMESPACE::TensorProto& tensor_proto = *(entry.second);
 
-    std::unique_ptr<MemBuffer> m;
-    // TODO: if the tensor need be copied, does it have enough room?
-    ORT_RETURN_IF_ERROR(planner.GetPreallocatedBuffer(ort_value_index, name, m));
-#ifndef NDEBUG
-    ORT_ENFORCE(m != nullptr);
-    ORT_ENFORCE(m->GetBuffer() != nullptr || m->GetLen() == 0);
-#endif
+    // pranav: make feature available for CPU only
     OrtValue ort_value;
-    Status st = DeserializeTensorProto(env, graph_loc, tensor_proto, *m, default_cpu_memory_info, ort_value, deleter,
-                                       data_transfer_mgr);
-    if (!st.IsOK()) {
-      std::ostringstream oss;
-      oss << "Deserialize tensor " << name << " failed." << st.ErrorMessage();
-      return Status(st.Category(), st.Code(), oss.str());
+    if (!found_user_supplied_initializer) {
+      std::unique_ptr<MemBuffer> m;
+      // TODO: if the tensor need be copied, does it have enough room?
+      ORT_RETURN_IF_ERROR(planner.GetPreallocatedBuffer(ort_value_index, name, m));
+#ifndef NDEBUG
+      ORT_ENFORCE(m != nullptr);
+      ORT_ENFORCE(m->GetBuffer() != nullptr || m->GetLen() == 0);
+#endif
+      Status st = DeserializeTensorProto(env, graph_loc, tensor_proto, *m, default_cpu_memory_info, ort_value, deleter,
+                                         data_transfer_mgr);
+      if (!st.IsOK()) {
+        std::ostringstream oss;
+        oss << "Deserialize tensor " << name << " failed." << st.ErrorMessage();
+        return Status(st.Category(), st.Code(), oss.str());
+      }
     }
 
     bool constant = graph.IsConstantInitializer(name, /* check_outer_scope */ false);

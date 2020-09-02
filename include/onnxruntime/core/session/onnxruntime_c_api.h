@@ -596,6 +596,9 @@ struct OrtApi {
   ORT_API2_STATUS(AddFreeDimensionOverride, _Inout_ OrtSessionOptions* options, _In_ const char* dim_denotation,
                   _In_ int64_t dim_value);
 
+  ORT_API2_STATUS(AddSharedInitializer, _Inout_ OrtSessionOptions* options, _In_ const char* name,
+                  _In_ OrtValue* val);
+
   /**
    * APIs to support non-tensor types - map and sequence.
    * Currently only the following types are supported
