@@ -320,6 +320,9 @@ class KernelDefBuilder {
   */
   std::unique_ptr<KernelDef> Build() {
     kernel_def_->CalculateHash();
+    std::cout << kernel_def_->op_name_ << ":" << kernel_def_->op_since_version_start_
+              << " (" << kernel_def_->op_domain_ << ") hash:" << kernel_def_->GetHash() << "\n";
+
     return std::move(kernel_def_);
   }
 

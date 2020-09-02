@@ -74,6 +74,7 @@ Status KernelRegistryManager::SearchKernelRegistry(const onnxruntime::Node& node
     std::ostringstream errormsg;
     errormsg << prefix << node.OpType() << "(" << node.SinceVersion() << ")";
     if (!node.Name().empty()) errormsg << " (node " << node.Name() << "). ";
+    errormsg << " EP:" << node.GetExecutionProviderType() << ". ";
     if (!status.IsOK()) errormsg << status.ErrorMessage();
 
     return errormsg.str();
