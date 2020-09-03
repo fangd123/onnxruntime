@@ -504,14 +504,14 @@ TEST(GradientCheckerTest, GemmGrad) {
 
 TEST(GradientCheckerTest, ReduceMeanGrad) {
   // Attribute axes supports negative values from opset 11.
-  OpDef op_def{"ReduceMean", kOnnxDomain, 13};
+  OpDef op_def{"ReduceMean", kOnnxDomain, 12};
 
   RunReductionTests(op_def);
 }
 
 TEST(GradientCheckerTest, ReduceSumGrad) {
   // Attribute axes supports negative values from opset 11.
-  OpDef op_def{"ReduceSum", kOnnxDomain, 13};
+  OpDef op_def{"ReduceSum", kOnnxDomain, 12};
 
   RunReductionTests(op_def);
 }
