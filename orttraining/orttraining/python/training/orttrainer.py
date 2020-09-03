@@ -476,7 +476,7 @@ class ORTTrainer(object):
         sample_inputs_copy = copy.deepcopy(sample_inputs)
 
         # Enable contrib ops export from PyTorch
-        from onnxruntime.experimental import register_custom_ops_pytorch_exporter
+        from onnxruntime.training import register_custom_ops_pytorch_exporter
         register_custom_ops_pytorch_exporter.register_custom_op()
 
         torch.onnx._export(model, tuple(sample_inputs_copy), f,
